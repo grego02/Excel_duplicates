@@ -26,12 +26,16 @@ def normalizar_texto(texto):
     return " ".join(str(texto).lower().strip().split())
 
 # Componente web para subir el archivo Excel
+# Componente web para subir el archivo Excel
 uploaded_file = st.file_uploader("Sube tu archivo de Excel", type=["xlsx", "xls"])
 
 if uploaded_file is not None:
     try:
-        # Leer el Excel cargado
-        df = pd.read_excel(uploaded_file, sheet_name=0)
+        # Leer el Excel cargado y forzar todas las celdas clave como texto para evitar errores de tipo
+        df = pd.read_excel(uploaded_file, sheet_name=0, dtype=str)
+        
+        # Limpiar posibles valores NaN (nulos) dejándolos como cadenas vacías
+        df = df.fillna("")
         
         st.subheader("Vista previa de los datos originales:")
         st.dataframe(df.head(5), use_container_width=True)
@@ -42,19 +46,24 @@ if uploaded_file is not None:
                 st.error("⚠️ No se encontró la `GEMINI_API_KEY` en la sección de Secrets de Streamlit. Por favor, configúrala en el archivo secrets.toml o en el panel de Streamlit Cloud.")
             else:
                 api_key = st.secrets["GEMINI_API_KEY"]
-                # Inicializar cliente de Gemini
                 client = genai.Client(api_key=api_key)
                 
                 with st.spinner("Procesando datos y consultando a Gemini... Esto puede tomar unos segundos."):
-                    # Validar columnas mínimas esperadas
+                    # Validar columnas mínimas esperadas basándonos en los nombres reales
                     col_codigo = 'código material' if 'código material' in df.columns else df.columns[0]
                     col_desc = 'descripción' if 'descripción' in df.columns else df.columns[1]
+
+                    # Asegurar que las columnas principales sean estrictamente texto
+                    df[col_codigo] = df[col_codigo].astype(str)
+                    df[col_desc] = df[col_desc].astype(str)
 
                     # Inicializar columnas de resultado
                     df['duplicado'] = 'no'
                     df['código referencia'] = ''
                     df['porcentaje'] = 0
                     df['explicación'] = 'Único / Sin duplicados detectados'
+
+
 
                     # -------------------------------------------------------------
                     # PASO 1: Verificación Simple en Python (Cero Costo / Cero Tokens)
